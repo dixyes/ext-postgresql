@@ -391,6 +391,8 @@ static PHP_METHOD(swoole_postgresql_coro, connect) {
     ON_SCOPE_EXIT {
         if (!object->connected) {
             object->conn = NULL;
+            object->socket->fd = -1;
+            object->socket->free();
         }
     };
 
@@ -421,15 +423,14 @@ static PHP_METHOD(swoole_postgresql_coro, connect) {
         }
 
         char *err_msg = PQerrorMessage(object->conn);
+        zend_update_property_string(
+            swoole_postgresql_coro_ce, SW_Z8_OBJ_P(ZEND_THIS), ZEND_STRL("error"), err_msg);
+
         if (pgsql == NULL || PQstatus(pgsql) == CONNECTION_STARTED) {
             swoole_warning(" [%s, %s] ", feedback, err_msg);
-        } else if (PQstatus(pgsql) == CONNECTION_MADE) {
+        } else {
             PQfinish(pgsql);
         }
-        zend_update_property_string(swoole_postgresql_coro_ce,
-                                    SW_Z8_OBJ_P(ZEND_THIS),
-                                    ZEND_STRL("error"),
-                                    swoole_strerror(swoole_get_last_error()));
         RETURN_FALSE;
     }
 
